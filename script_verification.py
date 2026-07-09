@@ -10,6 +10,7 @@ import re
 import os
 import glob
 import string
+import spwd
 from datetime import datetime, timedelta
 
 # Couleurs pour l'affichage
@@ -146,7 +147,32 @@ def common_passwords(filepath):
             except FileNotFoundError:
                 print(f"{filepath} not found")
             return common
-# --- Résumé ---
+def password_check(password, common_list):
+    score= 0 
+    feedback = []
+    if len(password) >= 8:
+        score +=1
+    else:
+        feedback.append("Le mot de passe doit être au minimum de 8 caractères")
+    if len(password) >= 12:
+        score +=1
+        feeback.append("mot de passe fort")
+    if any(c in string.ascii_uppercase for c in password):
+        score += 1
+    else:
+        feedback.append("Ajoutez au minimum une majuscule")
+    if any(c in string.punctuation for c in password):
+        score += 1
+    else:
+        feedback.append("Ajoutez au minimum un caractère spécial")
+    if any(c in string.digits for c in password):
+        score += 1
+    else:
+        feedbackappend("Ajoutez au minimum un chiffre")
+    if password.lower() in common_list:
+        feedback = ["Ce mot de passe est dans la liste des mots de passes communs. Choisissez un autre"]
+    return score, feedback
+    # --- Résumé ---
 print("\n" + "=" * 55)
 total = len(resultats)
 reussis = sum(1 for _, s in resultats if s == "PASS")
