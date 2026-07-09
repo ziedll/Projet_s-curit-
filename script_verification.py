@@ -11,7 +11,7 @@ import os
 import glob
 import string
 import pwd
-import crypt
+import legacycrypt as crypt
 from datetime import datetime, timedelta
 
 # Couleurs pour l'affichage
