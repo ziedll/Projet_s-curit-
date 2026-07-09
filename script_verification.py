@@ -170,7 +170,7 @@ def password_check(password, common_list):
         feedback.append("Le mot de passe doit être au minimum de 8 caractères")
     if len(password) >= 12:
         score +=1
-        feeback.append("mot de passe fort")
+        feedback.append("mot de passe fort")
     if any(c in string.ascii_uppercase for c in password):
         score += 1
     else:
@@ -182,7 +182,7 @@ def password_check(password, common_list):
     if any(c in string.digits for c in password):
         score += 1
     else:
-        feedbackappend("Ajoutez au minimum un chiffre")
+        feedback.append("Ajoutez au minimum un chiffre")
     if password.lower() in common_list:
         feedback = ["Ce mot de passe est dans la liste des mots de passes communs. Choisissez un autre"]
     return score, feedback
