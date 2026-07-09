@@ -9,6 +9,7 @@ import subprocess
 import re
 import os
 import glob
+import string
 from datetime import datetime, timedelta
 
 # Couleurs pour l'affichage
@@ -134,7 +135,17 @@ if backups:
     check("Sauvegarde récente (< 7 jours)", age < timedelta(days=7),
             
             f"dernière sauvegarde il y a {age.days} jour(s)")
-
+#verif mdp
+filepath = './100k-most-used-passwords-NCSC.txt'
+def common_passwords(filepath):
+    common=[]
+    try:
+        with open(filepath, "r") as f:
+            for line in f:
+                common.append(line.strip().lower())
+            except FileNotFoundError:
+                print(f"{filepath} not found")
+            return common
 # --- Résumé ---
 print("\n" + "=" * 55)
 total = len(resultats)
