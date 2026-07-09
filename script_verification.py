@@ -11,6 +11,7 @@ import os
 import glob
 import string
 import spwd
+import crypt
 from datetime import datetime, timedelta
 
 # Couleurs pour l'affichage
@@ -144,9 +145,9 @@ def common_passwords(filepath):
         with open(filepath, "r") as f:
             for line in f:
                 common.append(line.strip().lower())
-            except FileNotFoundError:
-                print(f"{filepath} not found")
-            return common
+    except FileNotFoundError:
+        print(f"{ROUGE}Erreur: Le fichier {filepath} n'a pas été trouvé.{RESET}")
+    return common
 def password_check(password, common_list):
     score= 0 
     feedback = []
@@ -172,6 +173,87 @@ def password_check(password, common_list):
     if password.lower() in common_list:
         feedback = ["Ce mot de passe est dans la liste des mots de passes communs. Choisissez un autre"]
     return score, feedback
+def main_password_checker():
+    strength_labels = {
+        0: "Très Faible",
+        1: "Faible",
+        2: "Modéré",
+        3: "Bon",
+        4: "Fort",
+        5: "Très Fort"
+    }
+    
+    common_list = common_passwords(filepath)
+    if not common_list:
+        print(f"{ROUGE}Impossible de procéder à la vérification des mots de passe sans la liste des mots de passe communs.{RESET}")
+        return
+
+    print("\n--- Audit des mots de passe des utilisateurs Linux ---")
+    
+    try:
+        for user_entry in pwd.getpwall():
+            username = user_entry.pw_name
+            
+            try:
+                shadow_entry = spwd.getspnam(username)
+                hashed_password = shadow_entry.sp_pwdp
+                
+                if not hashed_password or hashed_password == '!' or hashed_password == '*':
+                    continue
+                
+                parts = hashed_password.split('$')
+                salt = f"${parts[1]}${parts[2]}" if len(parts) >= 3 else hashed_password[:2]
+                
+                is_common = False
+                for common_pwd_candidate in common_list:
+                    hashed_common_pwd = crypt.crypt(common_pwd_candidate, salt)
+                    
+                    if hashed_common_pwd == hashed_password:
+                        check(f"Utilisateur '{username}' utilise un mot de passe commun", False, "Mot de passe faible détecté")
+                        is_common = True
+                        break
+                
+                if not is_common:
+                    check(f"Utilisateur '{username}' n'utilise pas de mot de passe commun", True)
+
+            except KeyError:
+                continue
+            except PermissionError:
+                print(f"{ROUGE}Erreur de permission: Impossible de lire les mots de passe hachés pour l'utilisateur '{username}'. Exécutez le script avec des privilèges suffisants (sudo).{RESET}")
+                break
+            except Exception as e:
+                print(f"{ROUGE}Erreur inattendue lors de la vérification de l'utilisateur '{username}': {e}{RESET}")
+                continue
+
+    except PermissionError:
+        print(f"{ROUGE}Erreur de permission: Impossible de lister les utilisateurs du système. Exécutez le script avec des privilèges suffisants (sudo).{RESET}")
+        return
+    except Exception as e:
+        print(f"{ROUGE}Erreur inattendue lors de la liste des utilisateurs: {e}{RESET}")
+        return
+
+    print("\n--- Vérificateur de force de mot de passe interactif ---")
+    while True:
+        password_to_check = input("Entrez un mot de passe à vérifier (ou 'q' pour quitter): ").strip()
+        if password_to_check.lower() == 'q':
+            break
+        
+        if not password_to_check:
+            print("Veuillez entrer un mot de passe.")
+            continue
+
+        score, feedback = password_check(password_to_check, common_list)
+        strength = strength_labels.get(score, "Inconnu")
+        
+        print(f"Force du mot de passe: {strength} (Score: {score}/5)")
+        if feedback:
+            print("Conseils:")
+            for item in feedback:
+                print(f" - {item}")
+        else:
+            print("Ce mot de passe semble fort et n'est pas dans la liste des mots de passe communs.")
+        print("-" * 30)
+main_password_checker()
     # --- Résumé ---
 print("\n" + "=" * 55)
 total = len(resultats)
