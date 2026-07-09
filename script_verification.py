@@ -10,7 +10,7 @@ import re
 import os
 import glob
 import string
-import spwd
+import pwd
 import crypt
 from datetime import datetime, timedelta
 
@@ -35,6 +35,19 @@ def lire_fichier(chemin):
             return f.read()
     except (FileNotFoundError, PermissionError):
         return None
+
+def lire_shadow():
+    """Lit /etc/shadow et retourne un dict {username: hash}"""
+    shadow_data = {}
+    try:
+        with open("/etc/shadow", "r") as f:
+            for line in f:
+                champs = line.strip().split(":")
+                if len(champs) >= 2:
+                    shadow_data[champs[0]] = champs[1]
+    except (FileNotFoundError, PermissionError):
+        pass
+    return shadow_data
 
 def commande(cmd):
     """Exécute une commande shell et retourne stdout"""
@@ -135,7 +148,7 @@ if backups:
     dernier_backup = max(backups, key=os.path.getmtime)
     age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(dernier_backup))
     check("Sauvegarde récente (< 7 jours)", age < timedelta(days=7),
-            
+
             f"dernière sauvegarde il y a {age.days} jour(s)")
 #verif mdp
 filepath = './100k-most-used-passwords-NCSC.txt'
@@ -149,7 +162,7 @@ def common_passwords(filepath):
         print(f"{ROUGE}Erreur: Le fichier {filepath} n'a pas été trouvé.{RESET}")
     return common
 def password_check(password, common_list):
-    score= 0 
+    score= 0
     feedback = []
     if len(password) >= 8:
         score +=1
@@ -182,42 +195,41 @@ def main_password_checker():
         4: "Fort",
         5: "Très Fort"
     }
-    
+
     common_list = common_passwords(filepath)
     if not common_list:
         print(f"{ROUGE}Impossible de procéder à la vérification des mots de passe sans la liste des mots de passe communs.{RESET}")
         return
 
     print("\n--- Audit des mots de passe des utilisateurs Linux ---")
-    
+
+    shadow_data = lire_shadow()
+
     try:
         for user_entry in pwd.getpwall():
             username = user_entry.pw_name
-            
+
             try:
-                shadow_entry = spwd.getspnam(username)
-                hashed_password = shadow_entry.sp_pwdp
-                
-                if not hashed_password or hashed_password == '!' or hashed_password == '*':
+                hashed_password = shadow_data.get(username)
+
+                if not hashed_password or hashed_password in ('!', '*', ''):
                     continue
-                
+
                 parts = hashed_password.split('$')
                 salt = f"${parts[1]}${parts[2]}" if len(parts) >= 3 else hashed_password[:2]
-                
+
                 is_common = False
                 for common_pwd_candidate in common_list:
                     hashed_common_pwd = crypt.crypt(common_pwd_candidate, salt)
-                    
+
                     if hashed_common_pwd == hashed_password:
                         check(f"Utilisateur '{username}' utilise un mot de passe commun", False, "Mot de passe faible détecté")
                         is_common = True
                         break
-                
+
                 if not is_common:
                     check(f"Utilisateur '{username}' n'utilise pas de mot de passe commun", True)
 
-            except KeyError:
-                continue
             except PermissionError:
                 print(f"{ROUGE}Erreur de permission: Impossible de lire les mots de passe hachés pour l'utilisateur '{username}'. Exécutez le script avec des privilèges suffisants (sudo).{RESET}")
                 break
@@ -237,14 +249,14 @@ def main_password_checker():
         password_to_check = input("Entrez un mot de passe à vérifier (ou 'q' pour quitter): ").strip()
         if password_to_check.lower() == 'q':
             break
-        
+
         if not password_to_check:
             print("Veuillez entrer un mot de passe.")
             continue
 
         score, feedback = password_check(password_to_check, common_list)
         strength = strength_labels.get(score, "Inconnu")
-        
+
         print(f"Force du mot de passe: {strength} (Score: {score}/5)")
         if feedback:
             print("Conseils:")
